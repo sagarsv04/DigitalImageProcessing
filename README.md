@@ -1,3 +1,14 @@
 # DigitalImageProcessing
-Handwritten Digit Recognition using Deep Neural Networks and Capsule Neural Network.
-Generative Adversarial Network For Image Synthesis Using Capsule Networks.
+
+Implementation of few algorithms to process images.
+
+
+Author :
+============
+Sagar Vishwakarma (svishwa2@binghamton.edu)
+
+State University of New York, Binghamton
+
+
+# Handwritten Digit Recognition using Deep Neural Networks.
+An implementation of DNN algorithm from the strach. "./dnn/mnist_dnn.py"
