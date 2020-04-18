@@ -82,6 +82,7 @@ class DeepNN:
 		# no_of_layers = len(structure)
 		self.learning_rate = learning_rate
 		self.bias = bias
+		self.num_epochs = 0
 		self.weights_matrices = []
 
 	def initializing(self):
@@ -187,6 +188,7 @@ class DeepNN:
 	def train(self, data, labels, num_epochs, intermediate_results=False):
 		# data, labels = train_data, train_labels
 		# num_epochs = 3
+		self.num_epochs = num_epochs
 		'''To train all the weights of neural layers
 			: input_vector is ndarray input data
 			: target_vector is ndarray(mnist 1d) data lable
@@ -194,7 +196,7 @@ class DeepNN:
 		labels_one_hot_array = get_one_hot_vector_array(labels)
 
 		intermediate_weights = []
-		for epoch in range(num_epochs):
+		for epoch in range(self.num_epochs):
 			# epoch = 0
 			print("Training Epoch ... {0}".format(epoch+1))
 			# epoch = 0 # number of training iterations
@@ -248,7 +250,7 @@ def tarin_test_model(is_train, is_test):
 			train_data, train_labels = dp.load_data()
 			dnn_model = DeepNN([28*28, 28*28*2, 28*28*2 , 10], 0.1, True)
 			dnn_model.initializing()
-			dnn_model.train(train_data, train_labels, 8)
+			dnn_model.train(train_data, train_labels, 4)
 			dnn_model.save("mnist_dnn")
 
 		if is_test:
