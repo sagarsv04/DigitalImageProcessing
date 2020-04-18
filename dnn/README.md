@@ -1,4 +1,4 @@
-# Handwritten Digit Recognition using Deep Neural Networks.
+# Handwritten Digit Recognition using Deep Neural Networks from scratch.
 
 An implementation of DNN algorithm from the strach.
 

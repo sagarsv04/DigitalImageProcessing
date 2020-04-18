@@ -19,6 +19,7 @@ def read_data(train_data=True):
 		print("Loading Testing Data ...")
 		data, labels = mnist_data.load_testing()
 
+	# data = np.array(data, dtype=float128)
 	data = np.array(data)
 	labels = np.array(labels)
 	# data[0], labels[0]
@@ -101,4 +102,5 @@ def main():
 
 
 if __name__ == '__main__':
+	os.chdir("../") # the base directory while running any code
 	main()

@@ -1,10 +1,14 @@
 #/usr/bin/pthon
 import os
+import sys
+os.chdir("../") # the base directory while running any code
+sys.path.append("{0}/res/".format(os.getcwd()))
 import numpy as np
 from tqdm import tqdm
 import pickle
+import argparse
 import matplotlib.pyplot as plt
-import res.data_processing as dp
+import data_processing as dp
 from scipy.stats import truncnorm
 
 
@@ -136,7 +140,7 @@ class DeepNN:
 			: target_vector is ndarray(mnist 1d) data lable
 		'''
 		input_vector = np.array(input_vector, ndmin=2).T
-		# input_vector.shape
+		# print("input_vector.shape", input_vector.shape)
 		# The output computed here becomes input vectors for the next layers:
 		res_vectors = [input_vector]
 		for layer_index in range(self.no_of_layers-1):
@@ -183,6 +187,10 @@ class DeepNN:
 	def train(self, data, labels, num_epochs, intermediate_results=False):
 		# data, labels = train_data, train_labels
 		# num_epochs = 3
+		'''To train all the weights of neural layers
+			: input_vector is ndarray input data
+			: target_vector is ndarray(mnist 1d) data lable
+		'''
 		labels_one_hot_array = get_one_hot_vector_array(labels)
 
 		intermediate_weights = []
@@ -229,19 +237,48 @@ class DeepNN:
 		return 0
 
 
-def main():
-	train_data, train_labels = dp.load_data()
-	dnn_model = DeepNN([28*28, 28*28*2, 28*28*2 , 10], 0.1, True)
-	dnn_model = DeepNN([28*28, 28*28*4, 28*28*4 , 10], 0.1, True)
-	dnn_model.save("temp")
-	dnn_model = load_model("temp")
-	dnn_model.structure
+def tarin_test_model(is_train, is_test):
 
-	dnn_model.train_dnn(train_data, train_labels, 8)
+	dnn_model = None
+	train_data, train_labels = None, None
+	test_data, test_labels = None, None
 
+	try:
+		if is_train:
+			train_data, train_labels = dp.load_data()
+			dnn_model = DeepNN([28*28, 28*28*2, 28*28*2 , 10], 0.1, True)
+			dnn_model.initializing()
+			dnn_model.train(train_data, train_labels, 8)
+			dnn_model.save("mnist_dnn")
+
+		if is_test:
+			test_data, test_labels = dp.load_data(False)
+			dnn_model = load_model("mnist_dnn")
+			if dnn_model != None:
+				dnn_model.test(test_data, test_labels)
+	except Exception as ex:
+		print("Error:: {0}".format(ex))
 
 	return 0
 
+
+
+def main():
+
+	parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
+	parser.add_argument("train", type=int,help="1 to Train model, 0 to !Train model")
+	parser.add_argument("test", type=int,help="1 to Test model, 0 to !Test model")
+	args = parser.parse_args()
+
+	if args.train and args.test:
+		tarin_test_model(True, True)
+	elif args.train:
+		tarin_test_model(True, False)
+	elif args.test:
+		tarin_test_model(False, True)
+	else:
+		print("Thanks for wasiting your time!")
+	return 0
 
 
 if __name__ == '__main__':
