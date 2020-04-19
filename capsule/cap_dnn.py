@@ -1,267 +1,250 @@
 #/usr/bin/pthon
 import os
-import sys
 os.chdir("../") # the base directory while running any code
-sys.path.append("{0}/res/".format(os.getcwd()))
-import tensorflow as tf
-import os
+import torch
+import numpy as np
+import torch.nn as nn
 from tqdm import tqdm
-import data_processing as dp
+import torch.nn.functional as F
+from torch.autograd import Variable
+from torch.optim import Adam
+from torchvision import datasets, transforms
 
 
-EPSILON = 1e-9
+USE_CUDA = True
+BATCH_SIZE = 100
+EPOCHS = 30
 
 
-def squashing_vectors(vector):
-	'''
-	Squashing function from paper Eq.1
-	:param vector: 4-D tensor or 5-D tensor: [batch_size, x, x, vec_length, 1]
-	:return:
-	'''
-	vector_squared_norm = tf.reduce_sum(tf.square(vector), axis=-2, keep_dims=True)
-	scalar_factor = vector_squared_norm / ((1 + vector_squared_norm) * tf.sqrt(vector_squared_norm + epsilon))
-	vector_squash = scalar_factor * vector  # element-wise
-	return vector_squash
+class MNISTData():
+	def __init__(self, batch_size):
+		dataset_transform = transforms.Compose([
+					transforms.ToTensor(),
+					transforms.Normalize((0.1307,), (0.3081,))
+					])
+		train_dataset = datasets.MNIST("./data/", train=True, download=True, transform=dataset_transform)
+		test_dataset = datasets.MNIST("./data/", train=False, download=True, transform=dataset_transform)
+		self.train_loader  = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+		self.test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
 
 
-def routing_input(input, b_IJ):
-	'''
-	routing algorithm
-	:param input: tensor, [batch_size, 1152, 1, 8, 1]
-	:param b_IJ: to compute c_IJ, [1, num_of_primaryCaps, num_of_DigitCaps, 1, 1]
-	:param vec_length: length of vector of v_i
-	:return: tensor, [batch_size, 1, 10, 16, 1]
-	'''
-	W = tf.get_variable('weight', shape=(1, input.shape[1].value, FLAGS.num_classes, input.shape[-2].value, 16),
-						dtype=tf.float32, initializer=tf.random_normal_initializer(stddev=FLAGS.stddev))
-	input = tf.tile(input, [1, 1, 10, 1, 1])
-	W = tf.tile(W, [FLAGS.batch_size, 1, 1, 1, 1])
-	assert input.get_shape() == [FLAGS.batch_size, 1152, 10, 8, 1]
-	u_hat = tf.matmul(W, input, transpose_a=True)
-	assert u_hat.get_shape() == [FLAGS.batch_size, 1152, 10, 16, 1]
+class ConvLayer(nn.Module):
+	def __init__(self, in_channels=1, out_channels=256, kernel_size=9):
+		super(ConvLayer, self).__init__()
 
-	# routing for update parameter without BackPropagation
-	for r_iter in range(FLAGS.iter_routing):
-		with tf.variable_scope('routing_iter_' + str(r_iter)):
-			c_IJ = tf.nn.softmax(b_IJ, dim=2)
-			assert c_IJ.get_shape() == [FLAGS.batch_size, 1152, 10, 1, 1]
-			# calc s_J: u_hat * c_IJ, element-wise in the last dims
-			s_J = tf.multiply(c_IJ, u_hat)
-			# sum the second dim
-			s_J = tf.reduce_sum(s_J, axis=1, keep_dims=True)
-			assert s_J.get_shape() == [FLAGS.batch_size, 1, 10, 16, 1]
-			# calc v_J: squashing(s_J)
-			v_J = _squashing(s_J)
-			assert v_J.get_shape() == [FLAGS.batch_size, 1, 10, 16, 1]
-			# update b_IJ = b_IJ + u_hat * v_J
-			v_J_tile = tf.tile(v_J, [1, 1152, 1, 1, 1])
-			# in last two dims: [16, 1].T * [16, 1] => [1, 1]
-			u_v = tf.matmul(u_hat, v_J_tile, transpose_a=True)
-			assert u_v.get_shape() == [FLAGS.batch_size, 1152, 10, 1, 1]
-			# reduce mean in the batch_size dim => [1, 1152, 10, 1, 1]
-			if r_iter < FLAGS.iter_routing - 1:
-				# b_IJ += tf.reduce_mean(u_v, axis=0, keep_dims=True)
-				b_IJ += u_v
-	return v_J
+		self.conv = nn.Conv2d(in_channels=in_channels,
+							out_channels=out_channels,
+							kernel_size=kernel_size,
+							stride=1)
+
+	def forward(self, x):
+		return F.relu(self.conv(x))
 
 
-def get_batch_data(train_data=True):
+class PrimaryCaps(nn.Module):
+	def __init__(self, num_capsules=8, in_channels=256, out_channels=32, kernel_size=9):
+		super(PrimaryCaps, self).__init__()
 
-	data, labels = dp.load_tf_data(train_data)
-	data = tf.convert_to_tensor(data / 255., tf.float32)
+		self.capsules = nn.ModuleList([
+			nn.Conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=kernel_size, stride=2, padding=0)
+						for _ in range(num_capsules)])
 
-	data_queues = tf.train.slice_input_producer([data, labels])
-	X, Y = tf.train.shuffle_batch(data_queues, num_threads=FLAGS.num_threads,
-									batch_size=FLAGS.batch_size,
-									capacity=FLAGS.batch_size * 64,
-									min_after_dequeue=FLAGS.batch_size * 32,
-									allow_smaller_final_batch=False)
-	return X, Y
+	def forward(self, x):
+		u = [capsule(x) for capsule in self.capsules]
+		u = torch.stack(u, dim=1)
+		u = u.view(x.size(0), 32 * 6 * 6, -1)
+		return self.squash(u)
 
-
-class CapsLayer():
-	'''
-	Capsule layer to build Capsule layer, like PrimaryCapsule and DigitCapsule
-	Args:
-		input: 4-D tensor
-		output_number: the number of capsule units(output) in this layer
-		vec_length: the length of vector (the number of node in a capsule)
-		layer_type: 'CONV' or 'FC'
-	Return:
-		4-D tensor
-	'''
-
-	def __init__(self, output_number, vec_length, layer_type):
-		self.output_number = output_number
-		self.vec_length = vec_length
-		self.layer_type = layer_type
-
-	def __call__(self, input):
-		if self.layer_type == 'CONV':
-			# Primary Capsule
-			assert input.get_shape() == [FLAGS.batch_size, 20, 20, 256]
-			capsules = tf.contrib.layers.conv2d(input, self.output_number * self.vec_length, 9, 2, padding='VALID')
-			capsules = tf.reshape(capsules, [FLAGS.batch_size, -1, self.vec_length, 1])
-			capsules = squashing_vectors(capsules)
-			assert capsules.get_shape() == [FLAGS.batch_size, 1152, 8, 1]
-			return capsules
-		elif self.layer_type == 'FC':
-			# Digit Capsule
-			# reshape input to [batch_sizer, 1152, 1, 8, 1]
-			with tf.variable_scope('routing'):
-				self.input = tf.reshape(input, shape=(FLAGS.batch_size, -1, 1, input.shape[-2].value, 1))
-				# b_IJ: [1, num_of_primaryCaps, num_of_DigitCaps, 1, 1]
-				b_IJ = tf.constant(np.zeros([FLAGS.batch_size, input.shape[1].value, self.output_number, 1, 1], dtype=np.float32))
-				capsules = routing_input(self.input, b_IJ)
-				capsules = tf.squeeze(capsules, axis=1)
-			return capsules
+	def squash(self, input_tensor):
+		squared_norm = (input_tensor ** 2).sum(-1, keepdim=True)
+		output_tensor = squared_norm *  input_tensor / ((1. + squared_norm) * torch.sqrt(squared_norm))
+		return output_tensor
 
 
-class CapsuleNet():
-	def __init__(self, is_training=True):
-		self.graph = tf.Graph()
-		with self.graph.as_default():
-			if is_training:
-				self.image, self.label = get_batch_data(is_training=True)
-				self.one_hot_label = tf.one_hot(self.label, depth=10, axis=1, dtype=tf.float32)
-				self.build_arch()
-				self.model_loss()
-				self.model_summary()
+class DigitCaps(nn.Module):
+	def __init__(self, num_capsules=10, num_routes=32 * 6 * 6, in_channels=8, out_channels=16):
+		super(DigitCaps, self).__init__()
 
-				self.global_step = tf.Variable(0, name='global_step', trainable=False)
-				self.optimizer = tf.train.AdamOptimizer()
-				self.train_op = self.optimizer.minimize(self.total_loss, global_step=self.global_step)
-			else:
-				if FLAGS.mask_with_y:
-					self.image = tf.placeholder(tf.float32, shape=(FLAGS.batch_size, 28, 28, 1))
-					self.one_hot_label = tf.placeholder(tf.float32, shape=(FLAGS.batch_size, 10, 1))
-					self.build_arch()
-				else:
-					self.image = tf.placeholder(tf.float32, shape=(FLAGS.batch_size, 28, 28, 1))
-					self.build_arch()
-		tf.logging.info('Seting up the main structure')
+		self.in_channels = in_channels
+		self.num_routes = num_routes
+		self.num_capsules = num_capsules
 
-	def build_arch(self):
-		# RELU CONV layer: return [batch_size, 20, 20, 256]
-		with tf.variable_scope('RELU_CONV_1'):
-			conv1 = tf.contrib.layers.conv2d(self.image, num_outputs=256, kernel_size=9, stride=1,
-											 padding='VALID')
-			assert conv1.get_shape() == [FLAGS.batch_size, 20, 20, 256]
+		self.W = nn.Parameter(torch.randn(1, num_routes, num_capsules, out_channels, in_channels))
 
-		# Primary Capsule: return [batch_size, 1152, 8, 1]
-		with tf.variable_scope('PrimaryCaps_layers'):
-			primaryCaps = CapsLayer(output_number=32, vec_length=8, layer_type='CONV')
-			caps1 = primaryCaps(conv1)
-			assert caps1.get_shape() == [FLAGS.batch_size, 1152, 8, 1]
+	def forward(self, x):
+		batch_size = x.size(0)
+		x = torch.stack([x] * self.num_capsules, dim=2).unsqueeze(4)
 
-		# Digit Capsule Layer: return [batch_size, 10, 16, 1]
-		with tf.variable_scope('DigitCaps_Layers'):
-			digitCaps = CapsLayer(output_number=10, vec_length=16, layer_type='FC')
-			self.caps2 = digitCaps(caps1)
+		W = torch.cat([self.W] * batch_size, dim=0)
+		u_hat = torch.matmul(W, x)
 
-		# decode structure to reconstruct figure
-		# 1. do making
-		with tf.variable_scope('Making'):
-			# a). calc ||v_j||, then do softmax(||v_j||)
-			# [batch_size, 10, 16, 1] => [batch_size, 10, 1, 1]
-			self.v_length = tf.sqrt(tf.reduce_sum(tf.square(self.caps2), axis=2, keep_dims=True) + epsilon)
-			self.softmax_v = tf.nn.softmax(self.v_length, dim=1)
-			assert self.softmax_v.get_shape() == [FLAGS.batch_size, 10, 1, 1]
+		b_ij = Variable(torch.zeros(1, self.num_routes, self.num_capsules, 1))
+		if USE_CUDA:
+			b_ij = b_ij.cuda()
 
-			# b). pick out the index of max softmax value of 10 caps, in a word, find label
-			# [batch_size, 10, 1, 1] => [batch_size](index(label))
-			self.argmax_idx = tf.to_int32(tf.argmax(self.softmax_v, axis=1))
-			assert self.argmax_idx.get_shape() == [FLAGS.batch_size, 1, 1]
-			self.argmax_idx = tf.reshape(self.argmax_idx, shape=(FLAGS.batch_size,))
+		num_iterations = 3
+		for iteration in range(num_iterations):
+			c_ij = F.softmax(b_ij)
+			c_ij = torch.cat([c_ij] * batch_size, dim=0).unsqueeze(4)
 
-			# method 1. mask with predict label
-			if not FLAGS.mask_with_y:
-				# c). indexing
-				masked_v = []
-				for batch_size in range(FLAGS.batch_size):
-					v = self.caps2[batch_size][self.argmax_idx[batch_size], :]
-					masked_v.append(tf.reshape(v, shape=(1, 1, 16, 1)))
-				self.masked_v = tf.concat(masked_v, axis=0)
-				assert self.masked_v.get_shape() == [FLAGS.batch_size, 1, 16, 1]
-			# method 2. mask with true label
-			else:
-				self.masked_v = tf.matmul(tf.squeeze(self.caps2),
-										  tf.reshape(self.one_hot_label, (-1, 10, 1)), transpose_a=True)
-				self.v_length = tf.sqrt(tf.reduce_sum(tf.square(self.caps2), axis=2, keep_dims=True)
-										+ epsilon)
-		# 2.Reconstruct image from 3 FC
-		with tf.variable_scope('Reconstruct'):
-			v_j = tf.reshape(self.masked_v, shape=(FLAGS.batch_size, -1))
-			fc1 = tf.contrib.layers.fully_connected(inputs=v_j, num_outputs=512)
-			assert fc1.get_shape() == [FLAGS.batch_size, 512]
-			fc2 = tf.contrib.layers.fully_connected(inputs=fc1, num_outputs=1024)
-			assert fc2.get_shape() == [FLAGS.batch_size, 1024]
-			self.reconstruct = tf.contrib.layers.fully_connected(inputs=fc2, num_outputs=784, activation_fn=tf.sigmoid)
+			s_j = (c_ij * u_hat).sum(dim=1, keepdim=True)
+			v_j = self.squash(s_j)
 
-	def model_loss(self):
-		# 1. margin_loss
-		# max_l = max(0, m_plus - ||v_c||)^2
-		max_l = tf.square(tf.maximum(0., FLAGS.m_plus - self.v_length))
-		# max_r = max(0, ||v_c|| - m_minus)^2
-		max_r = tf.square(tf.maximum(0., self.v_length - FLAGS.m_minus))
-		assert max_r.get_shape() == [FLAGS.batch_size, 10, 1, 1]
+			if iteration < num_iterations - 1:
+				a_ij = torch.matmul(u_hat.transpose(3, 4), torch.cat([v_j] * self.num_routes, dim=1))
+				b_ij = b_ij + a_ij.squeeze(4).mean(dim=0, keepdim=True)
 
-		# reshape: [batch_size, 10, 1, 1] => [batch_size, 10]
-		max_l = tf.reshape(max_l, shape=(FLAGS.batch_size, -1))
-		max_r = tf.reshape(max_r, shape=(FLAGS.batch_size, -1))
+		return v_j.squeeze(1)
 
-		T_c = self.one_hot_label
-		# element-wise multiply, [batch_size, 10]
-		L_c = T_c * max_l + FLAGS.lambda_val * (1 - T_c) * max_r
-		self.margin_loss = tf.reduce_mean(tf.reduce_mean(L_c, axis=1))
+	def squash(self, input_tensor):
+		squared_norm = (input_tensor ** 2).sum(-1, keepdim=True)
+		output_tensor = squared_norm *  input_tensor / ((1. + squared_norm) * torch.sqrt(squared_norm))
+		return output_tensor
 
-		# 2. reconstruction loss
-		image_true = tf.reshape(self.image, shape=(FLAGS.batch_size, -1))
-		self.reconstruct_loss = tf.reduce_mean(tf.square(self.reconstruct - image_true))
 
-		# 3. Total loss
-		# The paper uses sum of squared error as reconstruction error, but we
-		# have used reduce_mean in `# 2 The reconstruction loss` to calculate
-		# mean squared error. In order to keep in line with the paper,the
-		# regularization scale should be 0.0005*784=0.392
-		self.total_loss = self.margin_loss + FLAGS.regularization_scale * self.reconstruct_loss
+class Decoder(nn.Module):
+	def __init__(self):
+		super(Decoder, self).__init__()
 
-	def model_summary(self):
-		train_summary = []
-		train_summary.append(tf.summary.scalar('train/margin_loss', self.margin_loss))
-		train_summary.append(tf.summary.scalar('train/reconstruction_loss', self.reconstruct_loss))
-		train_summary.append(tf.summary.scalar('train/total_loss', self.total_loss))
-		recon_img = tf.reshape(self.reconstruct, shape=(FLAGS.batch_size, 28, 28, 1))
-		train_summary.append(tf.summary.image('reconstruction_img', recon_img))
-		self.train_summary = tf.summary.merge(train_summary)
+		self.reconstraction_layers = nn.Sequential(
+			nn.Linear(16 * 10, 512),
+			nn.ReLU(inplace=True),
+			nn.Linear(512, 1024),
+			nn.ReLU(inplace=True),
+			nn.Linear(1024, 784),
+			nn.Sigmoid()
+		)
 
-		correct_prediction = tf.equal(tf.to_int32(self.label), self.argmax_idx)
-		# ground_true = tf.cast(tf.arg_max(self.one_hot_label, 1), tf.int32)
-		# correct_prediction = tf.equal(ground_true, self.argmax_idx)
-		self.batch_accuracy = tf.reduce_sum(tf.cast(correct_prediction, tf.float32))
-		self.test_acc = tf.placeholder_with_default(tf.constant(0.), shape=[])
+	def forward(self, x, data):
+		classes = torch.sqrt((x ** 2).sum(2))
+		classes = F.softmax(classes)
+		_, max_length_indices = classes.max(dim=1)
+		masked = Variable(torch.sparse.torch.eye(10))
+		if USE_CUDA:
+			masked = masked.cuda()
+		masked = masked.index_select(dim=0, index=max_length_indices.squeeze(1).data)
+		reconstructions = self.reconstraction_layers((x * masked[:, :, None, None]).view(x.size(0), -1))
+		reconstructions = reconstructions.view(-1, 1, 28, 28)
+		return reconstructions, masked
 
+
+class CapsNet(nn.Module):
+	def __init__(self):
+		super(CapsNet, self).__init__()
+		self.conv_layer = ConvLayer()
+		self.primary_capsules = PrimaryCaps()
+		self.digit_capsules = DigitCaps()
+		self.decoder = Decoder()
+		self.mse_loss = nn.MSELoss()
+
+	def forward(self, data):
+		output = self.digit_capsules(self.primary_capsules(self.conv_layer(data)))
+		reconstructions, masked = self.decoder(output, data)
+		return output, reconstructions, masked
+
+	def loss(self, data, x, target, reconstructions):
+		return self.margin_loss(x, target) + self.reconstruction_loss(data, reconstructions)
+
+	def margin_loss(self, x, labels, size_average=True):
+		batch_size = x.size(0)
+		v_c = torch.sqrt((x**2).sum(dim=2, keepdim=True))
+		left = F.relu(0.9 - v_c).view(batch_size, -1)
+		right = F.relu(v_c - 0.1).view(batch_size, -1)
+		loss = labels * left + 0.5 * (1.0 - labels) * right
+		loss = loss.sum(dim=1).mean()
+		return loss
+
+	def reconstruction_loss(self, data, reconstructions):
+		loss = self.mse_loss(reconstructions.view(reconstructions.size(0), -1), data.view(reconstructions.size(0), -1))
+		return loss * 0.0005
+
+	def save(self, save_name):
+		print("Saving Model ...")
+		if not os.path.exists("./out/")
+			os.mkdir("./out/")
+		with open("./out/{0}.pkl".format(save_name), "wb") as file:
+			pickle.dump(self, file)
+		return 0
+
+
+def load_model(save_name):
+	model = None
+	if os.path.exists("./out/{0}.pkl".format(save_name)):
+		with open("./out/{0}.pkl".format(save_name), "rb") as file:
+			model = pickle.load(file)
+	else:
+		print("No File ... {0}.pkl".format(save_name))
+	return model
 
 
 def tarin_test_model(is_train, is_test):
 
-	dnn_model = None
-	train_data, train_labels = None, None
-	test_data, test_labels = None, None
-
+	capsule_net = None
+	mnist_data = MNISTData(BATCH_SIZE)
 	try:
 		if is_train:
-			train_data, train_labels = dp.load_data()
-			dnn_model = DeepNN([28*28, 28*28*2, 28*28*2 , 10], 0.1, True)
-			dnn_model.initializing()
-			dnn_model.train(train_data, train_labels, 8)
-			dnn_model.save("mnist_dnn")
+			capsule_net = CapsNet()
+			if USE_CUDA:
+				capsule_net = capsule_net.cuda()
+			optimizer = Adam(capsule_net.parameters())
+
+			for epoch in tqdm(range(EPOCHS)):
+				# epoch = 0
+				print("Traning Epoch ... {0}".format(epoch+1))
+				capsule_net.train()
+				train_loss = 0
+
+				for batch_id, (data, target) in enumerate(mnist_data.train_loader):
+					print("Train Batch Number ... {0}".format(batch_id+1))
+					# data, target = list(mnist_data.train_loader)[0]
+					# data.shape, target.shape
+					target = torch.sparse.torch.eye(10).index_select(dim=0, index=target)
+					data, target = Variable(data), Variable(target)
+
+					if USE_CUDA:
+						data, target = data.cuda(), target.cuda()
+
+					optimizer.zero_grad()
+					output, reconstructions, masked = capsule_net(data)
+					loss = capsule_net.loss(data, output, target, reconstructions)
+					loss.backward()
+					optimizer.step()
+
+					train_loss += loss.data[0]
+
+					if batch_id % BATCH_SIZE == 0:
+						accuracy = sum(np.argmax(masked.data.cpu().numpy(), 1) == np.argmax(target.data.cpu().numpy(), 1)) / float(BATCH_SIZE)
+						print("Train Batch {0} Accuracy ... {1}".format(batch_id+1, accuracy))
+				print("Total Traing Loss ... {0}".format(train_loss / len(mnist_data.train_loader)))
+
+			capsule_net.save("mnist_capsule")
 
 		if is_test:
-			test_data, test_labels = dp.load_data(False)
-			dnn_model = load_model("mnist_dnn")
-			if dnn_model != None:
-				dnn_model.test(test_data, test_labels)
+			capsule_net = load_model("mnist_capsule")
+			assert capsule_net == None
+			capsule_net.eval()
+			test_loss = 0
+			print("Testing Model ...")
+			for batch_id, (data, target) in enumerate(mnist_data.test_loader):
+				print("Batch Number ... {0}".format(batch_id+1))
+				# data, target = list(mnist_data.train_loader)[0]
+				# data.shape, target.shape
+				target = torch.sparse.torch.eye(10).index_select(dim=0, index=target)
+				data, target = Variable(data), Variable(target)
+
+				if USE_CUDA:
+					data, target = data.cuda(), target.cuda()
+
+				output, reconstructions, masked = capsule_net(data)
+				loss = capsule_net.loss(data, output, target, reconstructions)
+
+				test_loss += loss.data[0]
+
+				if batch_id % BATCH_SIZE == 0:
+					accuracy = sum(np.argmax(masked.data.cpu().numpy(), 1) == np.argmax(target.data.cpu().numpy(), 1)) / float(BATCH_SIZE)
+					print("Test Batch {0} Accuracy ... {1}".format(batch_id+1, accuracy))
+
+			print("Total Test Loss ... {0}".format(test_loss / len(mnist_data.test_loader)))
 	except Exception as ex:
 		print("Error:: {0}".format(ex))
 

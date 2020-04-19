@@ -130,3 +130,6 @@ dmypy.json
 
 *.gz
 *.pkl
+*-ubyte
+*.pt
+*_old*
