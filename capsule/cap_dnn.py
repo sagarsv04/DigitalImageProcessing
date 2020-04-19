@@ -5,6 +5,8 @@ import torch
 import numpy as np
 import torch.nn as nn
 from tqdm import tqdm
+import pickle
+import argparse
 import torch.nn.functional as F
 from torch.autograd import Variable
 from torch.optim import Adam
@@ -79,12 +81,14 @@ class DigitCaps(nn.Module):
 		u_hat = torch.matmul(W, x)
 
 		b_ij = Variable(torch.zeros(1, self.num_routes, self.num_capsules, 1))
+
 		if USE_CUDA:
 			b_ij = b_ij.cuda()
 
 		num_iterations = 3
 		for iteration in range(num_iterations):
-			c_ij = F.softmax(b_ij)
+			# print("b_ij", b_ij.shape)
+			c_ij = F.softmax(b_ij, dim=1)
 			c_ij = torch.cat([c_ij] * batch_size, dim=0).unsqueeze(4)
 
 			s_j = (c_ij * u_hat).sum(dim=1, keepdim=True)
@@ -117,7 +121,8 @@ class Decoder(nn.Module):
 
 	def forward(self, x, data):
 		classes = torch.sqrt((x ** 2).sum(2))
-		classes = F.softmax(classes)
+		# print("classes", classes.shape)
+		classes = F.softmax(classes, dim=1)
 		_, max_length_indices = classes.max(dim=1)
 		masked = Variable(torch.sparse.torch.eye(10))
 		if USE_CUDA:
@@ -160,7 +165,7 @@ class CapsNet(nn.Module):
 
 	def save(self, save_name):
 		print("Saving Model ...")
-		if not os.path.exists("./out/")
+		if not os.path.exists("./out/"):
 			os.mkdir("./out/")
 		with open("./out/{0}.pkl".format(save_name), "wb") as file:
 			pickle.dump(self, file)
@@ -195,9 +200,10 @@ def tarin_test_model(is_train, is_test):
 				train_loss = 0
 
 				for batch_id, (data, target) in enumerate(mnist_data.train_loader):
+					# batch_id = 0
 					print("Train Batch Number ... {0}".format(batch_id+1))
 					# data, target = list(mnist_data.train_loader)[0]
-					# data.shape, target.shape
+					# data.shape, target.shape, target[0]
 					target = torch.sparse.torch.eye(10).index_select(dim=0, index=target)
 					data, target = Variable(data), Variable(target)
 
@@ -210,12 +216,12 @@ def tarin_test_model(is_train, is_test):
 					loss.backward()
 					optimizer.step()
 
-					train_loss += loss.data[0]
+					train_loss += loss.data
 
 					if batch_id % BATCH_SIZE == 0:
 						accuracy = sum(np.argmax(masked.data.cpu().numpy(), 1) == np.argmax(target.data.cpu().numpy(), 1)) / float(BATCH_SIZE)
 						print("Train Batch {0} Accuracy ... {1}".format(batch_id+1, accuracy))
-				print("Total Traing Loss ... {0}".format(train_loss / len(mnist_data.train_loader)))
+				print("Epoch {0} Traing Loss ... {1}".format(epoch+1, train_loss / len(mnist_data.train_loader)))
 
 			capsule_net.save("mnist_capsule")
 
@@ -238,7 +244,7 @@ def tarin_test_model(is_train, is_test):
 				output, reconstructions, masked = capsule_net(data)
 				loss = capsule_net.loss(data, output, target, reconstructions)
 
-				test_loss += loss.data[0]
+				test_loss += loss.data
 
 				if batch_id % BATCH_SIZE == 0:
 					accuracy = sum(np.argmax(masked.data.cpu().numpy(), 1) == np.argmax(target.data.cpu().numpy(), 1)) / float(BATCH_SIZE)

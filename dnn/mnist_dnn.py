@@ -241,7 +241,7 @@ class DeepNN:
 	def save(self, save_name):
 
 		print("Saving Model ...")
-		if not os.path.exists("./out/")
+		if not os.path.exists("./out/"):
 			os.mkdir("./out/")
 		with open("./out/{0}.pkl".format(save_name), "wb") as file:
 			pickle.dump(self, file)
