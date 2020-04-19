@@ -241,6 +241,8 @@ class DeepNN:
 	def save(self, save_name):
 
 		print("Saving Model ...")
+		if not os.path.exists("./out/")
+			os.mkdir("./out/")
 		with open("./out/{0}.pkl".format(save_name), "wb") as file:
 			pickle.dump(self, file)
 		return 0
@@ -249,10 +251,6 @@ class DeepNN:
 def tarin_test_model(is_train, is_test):
 
 	dnn_model = None
-	# np.array(dnn_model.weights_matrices[0]).shape
-	# np.array(dnn_model.weights_matrices[1]).shape
-	# np.array(dnn_model.weights_matrices[2]).shape
-	# np.array(dnn_model.weights_matrices[3]).shape
 	train_data, train_labels = None, None
 	test_data, test_labels = None, None
 	try:

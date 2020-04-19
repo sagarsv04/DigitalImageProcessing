@@ -91,7 +91,6 @@ def load_tf_data(train_data=True):
 	data, labels = None, None
 
 	if train_data:
-		print("Loading ... training data")
 		if os.path.exists("./data/train-images-idx3-ubyte.gz") and \
 			os.path.exists("./data/train-labels-idx1-ubyte.gz"):
 			data, labels = read_data()
@@ -100,7 +99,6 @@ def load_tf_data(train_data=True):
 		else:
 			print("No File ... for training data")
 	else:
-		print("Loading ... testing data")
 		if os.path.exists("./data/t10k-images-idx3-ubyte.gz") and \
 			os.path.exists("./data/t10k-labels-idx1-ubyte.gz"):
 			data, labels = read_data(False)
