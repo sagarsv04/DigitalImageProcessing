@@ -51,7 +51,6 @@ def split_data(data, labels, ratio):
 	return train, train_lable, test, test_lable
 
 
-
 def save_data(data, labels, train_data=True):
 
 	if train_data:
@@ -87,6 +86,31 @@ def load_data(train_data=True):
 	return data, labels
 
 
+def load_tf_data(train_data=True):
+
+	data, labels = None, None
+
+	if train_data:
+		print("Loading ... training data")
+		if os.path.exists("./data/train-images-idx3-ubyte.gz") and \
+			os.path.exists("./data/train-labels-idx1-ubyte.gz"):
+			data, labels = read_data()
+			data = data.reshape((60000, 28, 28, 1)).astype(np.float)
+			labels = labels.reshape((60000)).astype(np.int32)
+		else:
+			print("No File ... for training data")
+	else:
+		print("Loading ... testing data")
+		if os.path.exists("./data/t10k-images-idx3-ubyte.gz") and \
+			os.path.exists("./data/t10k-labels-idx1-ubyte.gz"):
+			data, labels = read_data(False)
+			data = data.reshape((10000, 28, 28, 1)).astype(np.float)
+			labels = labels.reshape((10000)).astype(np.int32)
+		else:
+			print("No File ... for testing data")
+
+	return data, labels
+
 
 def main():
 	train_data, train_labels = read_data()
@@ -94,11 +118,8 @@ def main():
 
 	test_data, test_labels = read_data(False)
 	save_data(test_data, test_labels, False)
-
 	# train_data, train_labels = load_data()
-
 	return 0
-
 
 
 if __name__ == '__main__':
