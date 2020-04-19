@@ -207,14 +207,21 @@ class DeepNN:
 		return 0
 
 	def predict(self, input_vector):
+		# input_vector = data[0]
 		input_vector = np.array(input_vector, ndmin=2).T
-		for layer_index in range(self.no_of_layers):
+		# print("input_vector.shape", input_vector.shape)
+		for layer_index in range(self.no_of_layers-1):
 			if self.bias:
 				input_vector = np.concatenate((input_vector, [[self.bias]]))
+			# print("layer_index", layer_index)
+			# print("input_vector.shape  2", input_vector.shape)
+			# print("self.weights_matrices[layer_index]", np.array(self.weights_matrices[layer_index]).shape)
 			X = np.dot(self.weights_matrices[layer_index], input_vector)
+			# print("X", X.shape)
 			output_vector = activation_function(X)
+			# print("output_vector", output_vector.shape)
 			input_vector = output_vector
-
+			# print("\n\n\n")
 		res_max = output_vector.argmax()
 		return res_max
 
@@ -242,20 +249,25 @@ class DeepNN:
 def tarin_test_model(is_train, is_test):
 
 	dnn_model = None
+	# np.array(dnn_model.weights_matrices[0]).shape
+	# np.array(dnn_model.weights_matrices[1]).shape
+	# np.array(dnn_model.weights_matrices[2]).shape
+	# np.array(dnn_model.weights_matrices[3]).shape
 	train_data, train_labels = None, None
 	test_data, test_labels = None, None
-
 	try:
 		if is_train:
 			train_data, train_labels = dp.load_data()
+			# train_data.shape
 			dnn_model = DeepNN([28*28, 28*28*2, 28*28*2 , 10], 0.1, True)
 			dnn_model.initializing()
 			dnn_model.train(train_data, train_labels, 4)
 			dnn_model.save("mnist_dnn")
-
 		if is_test:
 			test_data, test_labels = dp.load_data(False)
+			# test_data.shape
 			dnn_model = load_model("mnist_dnn")
+			# dnn_model.
 			if dnn_model != None:
 				dnn_model.test(test_data, test_labels)
 	except Exception as ex:
