@@ -15,8 +15,8 @@ from torchvision import datasets, transforms
 
 USE_CUDA = True
 # USE_CUDA = False
-BATCH_SIZE = 100
-EPOCHS = 30
+BATCH_SIZE = 200
+EPOCHS = 6
 
 
 class MNISTData():
@@ -187,8 +187,8 @@ def tarin_test_model(is_train, is_test):
 
 	capsule_net = None
 	mnist_data = MNISTData(BATCH_SIZE)
-	try:
-		if is_train:
+	if is_train:
+		try:
 			capsule_net = CapsNet()
 			if USE_CUDA:
 				capsule_net = capsule_net.cuda()
@@ -226,9 +226,14 @@ def tarin_test_model(is_train, is_test):
 
 			capsule_net.save("mnist_capsule")
 
-		if is_test:
+		except Exception as ex:
+			print("Training Failed ...")
+			print("Error:: {0}".format(ex))
+
+
+	if is_test:
+		try:
 			capsule_net = load_model("mnist_capsule")
-			assert capsule_net == None
 			capsule_net.eval()
 			test_loss = 0
 			print("Testing Model ...")
@@ -252,8 +257,9 @@ def tarin_test_model(is_train, is_test):
 					print("Test Batch {0} Accuracy ... {1}".format(batch_id, accuracy))
 
 			print("Total Test Loss ... {0}".format(test_loss / len(mnist_data.test_loader)))
-	except Exception as ex:
-		print("Error:: {0}".format(ex))
+		except Exception as ex:
+			print("Testing Failed ...")
+			print("Error:: {0}".format(ex))
 
 	return 0
 
