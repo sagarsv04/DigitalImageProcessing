@@ -66,3 +66,15 @@ class Generator(nn.Module):
 	def forward (self, x, epoch):
 		out, p_caps, c_caps = self.gen(x, epoch)
 		return out, p_caps, c_caps
+
+
+def main():
+
+	generator = Generator(in_caps=6*6*32, num_caps=10, in_dim=8, dim_caps=16, dim_real=62)
+	print("The Generator Model ...\n{0}".format(generator))
+
+	return 0
+
+
+if __name__ == '__main__':
+	main()
