@@ -14,6 +14,7 @@ from torchvision import datasets, transforms
 
 
 USE_CUDA = True
+# USE_CUDA = False
 BATCH_SIZE = 100
 EPOCHS = 30
 
@@ -195,13 +196,13 @@ def tarin_test_model(is_train, is_test):
 
 			for epoch in tqdm(range(EPOCHS)):
 				# epoch = 0
-				print("Traning Epoch ... {0}".format(epoch+1))
+				print("Traning Epoch ... {0}".format(epoch))
 				capsule_net.train()
 				train_loss = 0
 
 				for batch_id, (data, target) in enumerate(mnist_data.train_loader):
 					# batch_id = 0
-					print("Train Batch Number ... {0}".format(batch_id+1))
+					# print("Train Batch Number ... {0}".format(batch_id))
 					# data, target = list(mnist_data.train_loader)[0]
 					# data.shape, target.shape, target[0]
 					target = torch.sparse.torch.eye(10).index_select(dim=0, index=target)
@@ -220,8 +221,8 @@ def tarin_test_model(is_train, is_test):
 
 					if batch_id % BATCH_SIZE == 0:
 						accuracy = sum(np.argmax(masked.data.cpu().numpy(), 1) == np.argmax(target.data.cpu().numpy(), 1)) / float(BATCH_SIZE)
-						print("Train Batch {0} Accuracy ... {1}".format(batch_id+1, accuracy))
-				print("Epoch {0} Traing Loss ... {1}".format(epoch+1, train_loss / len(mnist_data.train_loader)))
+						print("Train Batch {0} Accuracy ... {1}".format(batch_id, accuracy))
+				print("Epoch {0} Traing Loss ... {1}".format(epoch, train_loss / len(mnist_data.train_loader)))
 
 			capsule_net.save("mnist_capsule")
 
@@ -232,7 +233,7 @@ def tarin_test_model(is_train, is_test):
 			test_loss = 0
 			print("Testing Model ...")
 			for batch_id, (data, target) in enumerate(mnist_data.test_loader):
-				print("Batch Number ... {0}".format(batch_id+1))
+				# print("Batch Number ... {0}".format(batch_id))
 				# data, target = list(mnist_data.train_loader)[0]
 				# data.shape, target.shape
 				target = torch.sparse.torch.eye(10).index_select(dim=0, index=target)
@@ -248,7 +249,7 @@ def tarin_test_model(is_train, is_test):
 
 				if batch_id % BATCH_SIZE == 0:
 					accuracy = sum(np.argmax(masked.data.cpu().numpy(), 1) == np.argmax(target.data.cpu().numpy(), 1)) / float(BATCH_SIZE)
-					print("Test Batch {0} Accuracy ... {1}".format(batch_id+1, accuracy))
+					print("Test Batch {0} Accuracy ... {1}".format(batch_id, accuracy))
 
 			print("Total Test Loss ... {0}".format(test_loss / len(mnist_data.test_loader)))
 	except Exception as ex:
