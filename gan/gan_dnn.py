@@ -267,7 +267,6 @@ def tarin_test_model(is_train, is_generate):
 
 				# save the model parameters for each epoch
 				g_path = os.path.join(args.model_path, 'generator-%d.pkl' % (epoch + 1))
-				print(">>>>>>>>>>>> ",g_path)
 				torch.save(generator.state_dict(), g_path)
 			torch.save(generator.state_dict(), "./out/mnist_generator.pkl")
 		except Exception as ex:

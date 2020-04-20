@@ -133,3 +133,4 @@ dmypy.json
 *-ubyte
 *.pt
 *_old*
+*.png
