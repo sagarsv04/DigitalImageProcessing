@@ -13,8 +13,6 @@ from torch.optim import Adam
 from torchvision import datasets, transforms
 
 
-USE_CUDA = True
-# USE_CUDA = False
 BATCH_SIZE = 200
 EPOCHS = 6
 
@@ -83,7 +81,7 @@ class DigitCaps(nn.Module):
 
 		b_ij = Variable(torch.zeros(1, self.num_routes, self.num_capsules, 1))
 
-		if USE_CUDA:
+		if torch.cuda.is_available():
 			b_ij = b_ij.cuda()
 
 		num_iterations = 3
@@ -126,7 +124,7 @@ class Decoder(nn.Module):
 		classes = F.softmax(classes, dim=1)
 		_, max_length_indices = classes.max(dim=1)
 		masked = Variable(torch.sparse.torch.eye(10))
-		if USE_CUDA:
+		if torch.cuda.is_available():
 			masked = masked.cuda()
 		masked = masked.index_select(dim=0, index=max_length_indices.squeeze(1).data)
 		reconstructions = self.reconstraction_layers((x * masked[:, :, None, None]).view(x.size(0), -1))
@@ -190,7 +188,7 @@ def tarin_test_model(is_train, is_test):
 	if is_train:
 		try:
 			capsule_net = CapsNet()
-			if USE_CUDA:
+			if torch.cuda.is_available():
 				capsule_net = capsule_net.cuda()
 			optimizer = Adam(capsule_net.parameters())
 
@@ -208,7 +206,7 @@ def tarin_test_model(is_train, is_test):
 					target = torch.sparse.torch.eye(10).index_select(dim=0, index=target)
 					data, target = Variable(data), Variable(target)
 
-					if USE_CUDA:
+					if torch.cuda.is_available():
 						data, target = data.cuda(), target.cuda()
 
 					optimizer.zero_grad()
@@ -244,7 +242,7 @@ def tarin_test_model(is_train, is_test):
 				target = torch.sparse.torch.eye(10).index_select(dim=0, index=target)
 				data, target = Variable(data), Variable(target)
 
-				if USE_CUDA:
+				if torch.cuda.is_available():
 					data, target = data.cuda(), target.cuda()
 
 				output, reconstructions, masked = capsule_net(data)
