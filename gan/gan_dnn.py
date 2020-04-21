@@ -9,7 +9,6 @@ from torchvision import datasets, transforms
 from torchvision.utils import save_image
 from torch.autograd import Variable
 import matplotlib.pyplot as plt
-import pylab
 import numpy as np
 from tqdm import tqdm
 import pickle
@@ -20,7 +19,7 @@ np.random.seed(42)
 torch.manual_seed(42)
 
 BATCH_SIZE = 200
-EPOCHS = 30
+EPOCHS = 150
 
 
 class MNISTData():

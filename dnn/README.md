@@ -1,6 +1,6 @@
-# Handwritten Digit Recognition using Deep Neural Networks from scratch.
+# Handwritten Digit Recognition using Deep Neural Network from scratch.
 
-An implementation of DNN algorithm from the strach.
+An implementation of DNN algorithm from the scratch.
 
 Author :
 ============
