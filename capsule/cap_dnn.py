@@ -13,8 +13,11 @@ from torch.optim import Adam
 from torchvision import datasets, transforms
 
 
+np.random.seed(42)
+torch.manual_seed(42)
+
 BATCH_SIZE = 200
-EPOCHS = 1
+EPOCHS = 8
 
 
 class MNISTData():
