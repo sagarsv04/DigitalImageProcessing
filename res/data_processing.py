@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 
 def read_data(train_data=True):
 	# train=False
-	mnist_data = MNIST("./data/")
+	mnist_data = MNIST("./data/MNIST/raw/")
 	mnist_data.gz = True
 	data, labels = None, None
 	if train_data:
@@ -83,7 +83,7 @@ def load_data(train_data=True, normalize=False):
 		else:
 			print("No File ... testing_data.pkl")
 	if normalize:
-		data = data / 255 # normalization
+		data = data / 255.0 # normalization
 
 	return data, labels
 

@@ -120,6 +120,7 @@ def load_model(save_name):
 
 def get_accuracy(model, data, lable, train=True):
 	# model, data, lable = dnn_model, train_data, train_labels
+	# model, data, lable = dnn_model, test_data, test_labels
 	acc = 0
 	for idx in tqdm(range(data.shape[0])):
 		# idx = 0
@@ -157,9 +158,11 @@ def tarin_test_model(is_train, is_test):
 			test_data, test_labels = dp.load_data(train_data=False, normalize=True)
 			# test_data.shape
 			dnn_model = load_model("mnist_dnn")
+			test_labels = get_one_hot_vector_array(test_labels)
 			# dnn_model.weights_matrices
 			if dnn_model != None:
 				print("Training accuracy : ", get_accuracy(dnn_model, test_data, np.array(test_labels), False))
+				dnn_model.save("mnist_dnn")
 	except Exception as ex:
 		print("Error:: {0}".format(ex))
 
