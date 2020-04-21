@@ -22,14 +22,14 @@ State University of New York, Binghamton
 
 
 ## Language.
-Python                      > 3.5.2
+- Python                      > 3.5.2
 
 
 ## Libraries.
-matplotlib                    3.0.3
-scipy                         1.4.1
-tensorflow                    2.0.0
-tensorflow-gpu                2.0.0
-torch                         1.4.0
-torchvision                   0.5.0
-tqdm                          4.45.0
+- matplotlib                    3.0.3
+- scipy                         1.4.1
+- tensorflow                    2.0.0
+- tensorflow-gpu                2.0.0
+- torch                         1.4.0
+- torchvision                   0.5.0
+- tqdm                          4.45.0
