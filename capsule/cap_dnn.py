@@ -14,11 +14,12 @@ from torchvision import datasets, transforms
 
 
 BATCH_SIZE = 200
-EPOCHS = 6
+EPOCHS = 1
 
 
 class MNISTData():
 	def __init__(self, batch_size):
+		# batch_size = BATCH_SIZE
 		dataset_transform = transforms.Compose([
 					transforms.ToTensor(),
 					transforms.Normalize((0.1307,), (0.3081,))
@@ -140,6 +141,9 @@ class CapsNet(nn.Module):
 		self.digit_capsules = DigitCaps()
 		self.decoder = Decoder()
 		self.mse_loss = nn.MSELoss()
+		self.loss_list = []
+		self.train_accuracy = 0
+		self.test_accuracy = 0
 
 	def forward(self, data):
 		output = self.digit_capsules(self.primary_capsules(self.conv_layer(data)))
@@ -196,13 +200,11 @@ def tarin_test_model(is_train, is_test):
 				# epoch = 0
 				print("Traning Epoch ... {0}".format(epoch))
 				capsule_net.train()
-				train_loss = 0
-
+				epoch_loss = 0
+				batch_loss = 0
+				train_accuracy = 0
+				last_batch = len(mnist_data.train_loader)
 				for batch_id, (data, target) in enumerate(mnist_data.train_loader):
-					# batch_id = 0
-					# print("Train Batch Number ... {0}".format(batch_id))
-					# data, target = list(mnist_data.train_loader)[0]
-					# data.shape, target.shape, target[0]
 					target = torch.sparse.torch.eye(10).index_select(dim=0, index=target)
 					data, target = Variable(data), Variable(target)
 
@@ -214,16 +216,19 @@ def tarin_test_model(is_train, is_test):
 					loss = capsule_net.loss(data, output, target, reconstructions)
 					loss.backward()
 					optimizer.step()
-
-					train_loss += loss.data
-
-					if batch_id % BATCH_SIZE == 0:
-						accuracy = sum(np.argmax(masked.data.cpu().numpy(), 1) == np.argmax(target.data.cpu().numpy(), 1)) / float(BATCH_SIZE)
+					batch_loss = loss.data
+					capsule_net.loss_list.append(batch_loss) # to plot
+					if ((batch_id > 0) and (batch_id % BATCH_SIZE == 0)) or (batch_id == last_batch-1):
+						currect_sum = sum(np.argmax(masked.data.cpu().numpy(), 1) == np.argmax(target.data.cpu().numpy(), 1))
+						accuracy = (currect_sum/float(BATCH_SIZE))*100
+						train_accuracy = accuracy
+						epoch_loss = batch_loss
 						print("Train Batch {0} Accuracy ... {1}".format(batch_id, accuracy))
-				print("Epoch {0} Traing Loss ... {1}".format(epoch, train_loss / len(mnist_data.train_loader)))
-
+				capsule_net.loss_list.append(epoch_loss) # to plot
+				print("Epoch {0} Training Loss ... {1}".format(epoch, epoch_loss))
+			capsule_net.train_accuracy = train_accuracy
+			print("Training Accuracy ...{0}".format(capsule_net.train_accuracy))
 			capsule_net.save("mnist_capsule")
-
 		except Exception as ex:
 			print("Training Failed ...")
 			print("Error:: {0}".format(ex))
@@ -233,12 +238,10 @@ def tarin_test_model(is_train, is_test):
 		try:
 			capsule_net = load_model("mnist_capsule")
 			capsule_net.eval()
-			test_loss = 0
 			print("Testing Model ...")
+			test_accuracy = 0
+			last_batch = len(mnist_data.test_loader)
 			for batch_id, (data, target) in enumerate(mnist_data.test_loader):
-				# print("Batch Number ... {0}".format(batch_id))
-				# data, target = list(mnist_data.train_loader)[0]
-				# data.shape, target.shape
 				target = torch.sparse.torch.eye(10).index_select(dim=0, index=target)
 				data, target = Variable(data), Variable(target)
 
@@ -247,14 +250,13 @@ def tarin_test_model(is_train, is_test):
 
 				output, reconstructions, masked = capsule_net(data)
 				loss = capsule_net.loss(data, output, target, reconstructions)
-
-				test_loss += loss.data
-
-				if batch_id % BATCH_SIZE == 0:
-					accuracy = sum(np.argmax(masked.data.cpu().numpy(), 1) == np.argmax(target.data.cpu().numpy(), 1)) / float(BATCH_SIZE)
+				if ((batch_id > 0) and (batch_id % BATCH_SIZE == 0)) or (batch_id == last_batch-1):
+					currect_sum = sum(np.argmax(masked.data.cpu().numpy(), 1) == np.argmax(target.data.cpu().numpy(), 1))
+					accuracy = (currect_sum/float(BATCH_SIZE))*100
+					test_accuracy = accuracy
 					print("Test Batch {0} Accuracy ... {1}".format(batch_id, accuracy))
-
-			print("Total Test Loss ... {0}".format(test_loss / len(mnist_data.test_loader)))
+			capsule_net.test_accuracy = test_accuracy
+			print("Training Accuracy ...{0}".format(capsule_net.test_accuracy))
 		except Exception as ex:
 			print("Testing Failed ...")
 			print("Error:: {0}".format(ex))
