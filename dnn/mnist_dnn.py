@@ -7,44 +7,31 @@ import numpy as np
 from tqdm import tqdm
 import pickle
 import argparse
-import matplotlib.pyplot as plt
 import data_processing as dp
-from scipy.stats import truncnorm
+
+np.random.seed(42)
 
 
-# Activation Functions
+def sigmoid(s):
+	return 1/(1 + np.exp(-s))
 
-def sigmoid(X):
-	return 1/(1+np.exp(-X))
+def sigmoid_derv(s):
+	return s * (1 - s)
 
-def relu(X):
-	return np.maximum(0,X)
+def softmax(s):
+	exps = np.exp(s - np.max(s, axis=1, keepdims=True))
+	return exps/np.sum(exps, axis=1, keepdims=True)
 
-def leaky_relu(X):
-	return np.maximum(0.1 * X, X)
+def cross_entropy(pred, real):
+	n_samples = real.shape[0]
+	res = pred - real
+	return res/n_samples
 
-def softmax(X):
-	expo = np.exp(X)
-	expo_sum = np.sum(np.exp(X))
-	return expo/expo_sum
-
-def tanh(X):
-	return np.tanh(X)
-
-# passing reference of activation function
-activation_function = sigmoid
-
-
-def truncated_normal(mean=0, sd=1, low=0, upp=10):
-	'''To generate random numbers with normal distribution'''
-	# mean,sd,low,upp=0,1,0,10
-	return truncnorm((low-mean)/sd, (upp-mean)/sd, loc=mean, scale=sd)
-
-
-# Calculate the derivative of an neuron output
-def transfer_derivative(output_vector, output_errors):
-	# output_vector.shape, output_errors.shape
-	return output_errors * output_vector * (1.0 - output_vector)
+def error(pred, real):
+	n_samples = real.shape[0]
+	logp = - np.log(pred[np.arange(n_samples), real.argmax(axis=1)])
+	loss = np.sum(logp)/n_samples
+	return loss
 
 
 def get_one_hot_vector_array(labels):
@@ -60,6 +47,67 @@ def get_one_hot_vector_array(labels):
 	return labels_one_hot_array
 
 
+
+class MyNN:
+	def __init__(self, x, y, epoch):
+		self.x = x
+		neurons = 128
+		self.lr = 0.5
+		# x = train_data
+		# y = train_labels
+		ip_dim = x.shape[1]
+		op_dim = y.shape[1]
+		self.epoch = epoch
+		self.train_accuracy = 0
+		self.test_accuracy = 0
+		self.loss = []
+
+		self.w1 = np.random.randn(ip_dim, neurons)
+		self.b1 = np.zeros((1, neurons))
+		self.w2 = np.random.randn(neurons, neurons)
+		self.b2 = np.zeros((1, neurons))
+		self.w3 = np.random.randn(neurons, op_dim)
+		self.b3 = np.zeros((1, op_dim))
+		self.y = y
+
+	def feedforward(self):
+		z1 = np.dot(self.x, self.w1) + self.b1
+		self.a1 = sigmoid(z1)
+		z2 = np.dot(self.a1, self.w2) + self.b2
+		self.a2 = sigmoid(z2)
+		z3 = np.dot(self.a2, self.w3) + self.b3
+		self.a3 = softmax(z3)
+
+	def backprop(self):
+		loss = error(self.a3, self.y)
+		self.loss.append(loss)
+		a3_delta = cross_entropy(self.a3, self.y) # w3
+		z2_delta = np.dot(a3_delta, self.w3.T)
+		a2_delta = z2_delta * sigmoid_derv(self.a2) # w2
+		z1_delta = np.dot(a2_delta, self.w2.T)
+		a1_delta = z1_delta * sigmoid_derv(self.a1) # w1
+
+		self.w3 -= self.lr * np.dot(self.a2.T, a3_delta)
+		self.b3 -= self.lr * np.sum(a3_delta, axis=0, keepdims=True)
+		self.w2 -= self.lr * np.dot(self.a1.T, a2_delta)
+		self.b2 -= self.lr * np.sum(a2_delta, axis=0)
+		self.w1 -= self.lr * np.dot(self.x.T, a1_delta)
+		self.b1 -= self.lr * np.sum(a1_delta, axis=0)
+
+	def predict(self, data):
+		self.x = data
+		self.feedforward()
+		return self.a3.argmax()
+
+	def save(self, save_name):
+		print("Saving Model ...")
+		if not os.path.exists("./out/"):
+			os.mkdir("./out/")
+		with open("./out/{0}.pkl".format(save_name), "wb") as file:
+			pickle.dump(self, file)
+		return 0
+
+
 def load_model(save_name):
 	model = None
 	if os.path.exists("./out/{0}.pkl".format(save_name)):
@@ -70,182 +118,21 @@ def load_model(save_name):
 	return model
 
 
-class DeepNN:
+def get_accuracy(model, data, lable, train=True):
+	# model, data, lable = dnn_model, train_data, train_labels
+	acc = 0
+	for idx in tqdm(range(data.shape[0])):
+		# idx = 0
+		s = model.predict(data[idx])
+		if s == np.argmax(lable[idx]):
+			acc +=1
+	acc = (acc/data.shape[0])*100
+	if train:
+		model.train_accuracy = acc
+	else:
+		model.test_accuracy = acc
+	return acc
 
-	def __init__(self, network_structure, learning_rate, bias=None):
-		# network_structure = [28*28, 28*28*2, 28*28*2 , 10]
-		# learning_rate = 0.01
-		# bias = 1
-		self.structure = network_structure  # ie. [input_nodes, hidden1_nodes, ... , hidden_n_nodes, output_nodes]
-		# structure = network_structure
-		self.no_of_layers = len(self.structure)
-		# no_of_layers = len(structure)
-		self.learning_rate = learning_rate
-		self.bias = bias
-		self.num_epochs = 0
-		self.weights_matrices = []
-
-	def initializing(self):
-
-		self.create_weight_matrices()
-		return 0
-
-
-	def create_weight_matrices(self):
-		'''To generate random weights between neural layers'''
-
-		if self.bias:
-			bias_node = 1
-		else:
-			bias_node = 0
-
-		print("Initializing Weight Matrices ...")
-		for layer_index in tqdm(range(self.no_of_layers-1)):
-			# layer_index = 2
-			input_nodes = self.structure[layer_index]
-			# input_nodes = structure[layer_index]
-			output_nodes = self.structure[layer_index+1]
-			# output_nodes = structure[layer_index+1]
-			total_node = (input_nodes + bias_node) * output_nodes
-			# rad = 1 / np.sqrt(784)
-			rad = 1 / np.sqrt(input_nodes)
-			X = truncated_normal(mean=2, sd=1, low=-rad, upp=rad)
-			# weights_matrix = X.rvs(n).reshape((1568, 784 + 1))
-			weights_matrix = X.rvs(total_node).reshape((output_nodes, input_nodes + bias_node))
-			# weights_matrix.shape
-			self.weights_matrices.append(weights_matrix)
-
-		return 0
-
-	def update_weights(self, layer_index, output_derivative):
-		'''To update weights of neural layer
-			: output_derivative is ndarray of delta values
-		'''
-		self.weights_matrices[layer_index-1] += self.learning_rate * output_derivative
-		# self.weights_matrices[layer_index-1] += learning_rate * output_derivative
-		# weights_matrices[1].shape
-		return 0
-
-	def get_output_errors(self, layer_index, output_errors):
-		'''To calculate new output error
-			: output_errors is target_vector - output_vector
-		'''
-		output_errors = np.dot(self.weights_matrices[layer_index-1].T, output_errors)
-		# output_errors = np.dot(weights_matrices[layer_index-1].T, output_errors)
-		return output_errors
-
-	def train_single_data(self, input_vector, target_vector):
-		# input_vector, target_vector = data[data_idx], labels_one_hot_array[data_idx]
-		'''To train weights between neural layers
-			: input_vector is ndarray input data
-			: target_vector is ndarray(mnist 1d) data lable
-		'''
-		input_vector = np.array(input_vector, ndmin=2).T
-		# print("input_vector.shape", input_vector.shape)
-		# The output computed here becomes input vectors for the next layers:
-		res_vectors = [input_vector]
-		for layer_index in range(self.no_of_layers-1):
-			# layer_index = 2
-			input_vector = res_vectors[-1]
-			# input_vector.shape
-			if self.bias:
-				# adding bias node to the end of the 'input_vector'
-				input_vector = np.concatenate((input_vector, [[self.bias]]))
-				# input_vector = np.concatenate((input_vector, [[bias]]))
-				res_vectors[-1] = input_vector
-			# Taking dot product of nth layer wieghts and input_vector
-			X = np.dot(self.weights_matrices[layer_index], input_vector)
-			# X = np.dot(weights_matrices[layer_index], input_vector)
-			output_vector = activation_function(X)
-			res_vectors.append(output_vector)
-
-		target_vector = np.array(target_vector, ndmin=2).T
-
-		# The input->output vectors of the various layers:
-		output_errors = target_vector - res_vectors[-1]
-		# output_errors.shape
-		for layer_index in reversed(range(1, self.no_of_layers)):
-			# layer_index = 1 #
-			output_vector = res_vectors[layer_index]
-			# output_vector.shape
-			input_vector = res_vectors[layer_index-1]
-			# input_vector.shape
-			if self.bias:
-				# layer_index!=(no_of_layers-1)
-				if layer_index!=(self.no_of_layers-1):
-					output_vector = output_vector[:-1,:].copy()
-					output_errors = output_errors[:-1:].copy()
-
-			output_derivative = transfer_derivative(output_vector, output_errors)
-			# output_derivative.shape
-			output_derivative = np.dot(output_derivative, input_vector.T)
-			# output_derivative.shape
-			self.update_weights(layer_index, output_derivative)
-			output_errors = self.get_output_errors(layer_index, output_errors)
-
-		return 0
-
-	def train(self, data, labels, num_epochs, intermediate_results=False):
-		# data, labels = train_data, train_labels
-		# num_epochs = 3
-		self.num_epochs = num_epochs
-		'''To train all the weights of neural layers
-			: input_vector is ndarray input data
-			: target_vector is ndarray(mnist 1d) data lable
-		'''
-		labels_one_hot_array = get_one_hot_vector_array(labels)
-
-		intermediate_weights = []
-		for epoch in range(self.num_epochs):
-			# epoch = 0
-			print("Training Epoch ... {0}".format(epoch+1))
-			# epoch = 0 # number of training iterations
-			for data_idx in tqdm(range(data.shape[0])):
-				# data_idx = 0 # nth training data
-				self.train_single_data(data[data_idx], labels_one_hot_array[data_idx])
-
-		return 0
-
-	def predict(self, input_vector):
-		# input_vector = data[0]
-		input_vector = np.array(input_vector, ndmin=2).T
-		# print("input_vector.shape", input_vector.shape)
-		for layer_index in range(self.no_of_layers-1):
-			if self.bias:
-				input_vector = np.concatenate((input_vector, [[self.bias]]))
-			# print("layer_index", layer_index)
-			# print("input_vector.shape  2", input_vector.shape)
-			# print("self.weights_matrices[layer_index]", np.array(self.weights_matrices[layer_index]).shape)
-			X = np.dot(self.weights_matrices[layer_index], input_vector)
-			# print("X", X.shape)
-			output_vector = activation_function(X)
-			# print("output_vector", output_vector.shape)
-			input_vector = output_vector
-			# print("\n\n\n")
-		res_max = output_vector.argmax()
-		return res_max
-
-	def test(self, data, labels):
-		# data, labels = test_data, test_labels
-		labels_one_hot_array = get_one_hot_vector_array(labels)
-		correct_count = 0
-		print("Testing Model ...")
-		for data_idx in tqdm(range(data.shape[0])):
-			# data_idx = 0 # nth training data
-			res_max = self.predict(data[data_idx])
-			if res_max==labels[data_idx]:
-				correct_count += 1
-		print("Accuracy ... {0}".format(correct_count/data.shape[0]))
-		return 0
-
-	def save(self, save_name):
-
-		print("Saving Model ...")
-		if not os.path.exists("./out/"):
-			os.mkdir("./out/")
-		with open("./out/{0}.pkl".format(save_name), "wb") as file:
-			pickle.dump(self, file)
-		return 0
 
 
 def tarin_test_model(is_train, is_test):
@@ -255,19 +142,24 @@ def tarin_test_model(is_train, is_test):
 	test_data, test_labels = None, None
 	try:
 		if is_train:
-			train_data, train_labels = dp.load_data()
+			train_data, train_labels = dp.load_data(normalize=True)
+			train_labels = get_one_hot_vector_array(train_labels)
 			# train_data.shape
-			dnn_model = DeepNN([28*28, 28*28*2, 28*28*2 , 10], 0.1, True)
-			dnn_model.initializing()
-			dnn_model.train(train_data, train_labels, 4)
+			dnn_model = MyNN(train_data, np.array(train_labels), 1500)
+			for epoch in tqdm(range(dnn_model.epoch)):
+				dnn_model.feedforward()
+				dnn_model.backprop()
+			print("Epoch: {0}, Loss: {1}".format(dnn_model.epoch, dnn_model.loss[-1]))
+			# dnn_model.weight2
+			print("Training accuracy : ", get_accuracy(dnn_model, train_data, np.array(train_labels)))
 			dnn_model.save("mnist_dnn")
 		if is_test:
-			test_data, test_labels = dp.load_data(False)
+			test_data, test_labels = dp.load_data(train_data=False, normalize=True)
 			# test_data.shape
 			dnn_model = load_model("mnist_dnn")
-			# dnn_model.
+			# dnn_model.weights_matrices
 			if dnn_model != None:
-				dnn_model.test(test_data, test_labels)
+				print("Training accuracy : ", get_accuracy(dnn_model, test_data, np.array(test_labels), False))
 	except Exception as ex:
 		print("Error:: {0}".format(ex))
 

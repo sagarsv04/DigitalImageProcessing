@@ -65,7 +65,7 @@ def save_data(data, labels, train_data=True):
 	return 0
 
 
-def load_data(train_data=True):
+def load_data(train_data=True, normalize=False):
 
 	data, labels = None, None
 	if train_data:
@@ -82,6 +82,8 @@ def load_data(train_data=True):
 				data, labels = pickle.load(file)
 		else:
 			print("No File ... testing_data.pkl")
+	if normalize:
+		data = data / 255 # normalization
 
 	return data, labels
 
