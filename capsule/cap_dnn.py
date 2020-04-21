@@ -260,6 +260,7 @@ def tarin_test_model(is_train, is_test):
 					print("Test Batch {0} Accuracy ... {1}".format(batch_id, accuracy))
 			capsule_net.test_accuracy = test_accuracy
 			print("Training Accuracy ...{0}".format(capsule_net.test_accuracy))
+			# capsule_net.save("mnist_capsule")
 		except Exception as ex:
 			print("Testing Failed ...")
 			print("Error:: {0}".format(ex))
