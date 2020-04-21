@@ -2,21 +2,19 @@
 
 An implementation of DNN algorithm from the scratch.
 
-Author :
-============
+## Author :
+
 Sagar Vishwakarma (svishwa2@binghamton.edu)
 
 State University of New York, Binghamton
 
 
-File :
-============
+## File :
 
-1)	mnist_dnn.py                   - algorithm file
+- mnist_dnn.py                   - algorithm file
 
 
-Run :
-============
+## Run :
 
 - download train and test data into folder "./data/" (ie:train-labels-idx1-ubyte.gz)
 - Open a terminal in project directory

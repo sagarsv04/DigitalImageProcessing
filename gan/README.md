@@ -2,21 +2,19 @@
 
 An implementation of Generative Adversarial Networks algorithm.
 
-Author :
-============
+## Author :
+
 Sagar Vishwakarma (svishwa2@binghamton.edu)
 
 State University of New York, Binghamton
 
 
-File :
-============
+## File :
 
-1)	gan_dnn.py                   - algorithm file
+- gan_dnn.py                   - algorithm file
 
 
-Run :
-============
+## Run :
 
 - Open a terminal in project directory
 - To run algorithm                                      : python gan_dnn.py <train_flag> <generate_flag>

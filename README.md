@@ -9,23 +9,23 @@ Sagar Vishwakarma (svishwa2@binghamton.edu)
 State University of New York, Binghamton
 
 
-# Handwritten Digit Recognition using Deep Neural Network from scratch.
+## Handwritten Digit Recognition using Deep Neural Network from scratch.
 - An implementation of Deep Neural Network algorithm from the strach. "./dnn/mnist_dnn.py"
 
 
-# Handwritten Digit Recognition using Capsule Network.
+## Handwritten Digit Recognition using Capsule Network.
 - An implementation of Capsule Network algorithm. "./capsule/cap_dnn.py"
 
 
-# Handwritten Digit Recognition Generation using Generative Adversarial Networks.
+## Handwritten Digit Recognition Generation using Generative Adversarial Networks.
 - An implementation of Generative Adversarial Networks algorithm. "./gan/gan_dnn.py"
 
 
-# Language.
+## Language.
 Python                      > 3.5.2
 
 
-# Libraries.
+## Libraries.
 matplotlib                    3.0.3
 scipy                         1.4.1
 tensorflow                    2.0.0
