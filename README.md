@@ -17,7 +17,7 @@ State University of New York, Binghamton
 - An implementation of Capsule Network algorithm. "./capsule/cap_dnn.py"
 
 
-## Handwritten Digit Recognition Generation using Generative Adversarial Networks.
+# Handwritten Digit Generation using Generative Adversarial Network.
 - An implementation of Generative Adversarial Networks algorithm. "./gan/gan_dnn.py"
 
 

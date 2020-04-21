@@ -1,4 +1,4 @@
-# Handwritten Digit Recognition and Generation using Generative Adversarial Networks.
+# Handwritten Digit Generation using Generative Adversarial Network.
 
 An implementation of Generative Adversarial Networks algorithm.
 
