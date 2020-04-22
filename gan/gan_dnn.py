@@ -1,12 +1,12 @@
 #/usr/bin/pthon
 import os
 import sys
-os.chdir("../") # the base directory while running any code
+if __name__ == '__main__':
+	os.chdir("../") # the base directory while running any code
 sys.path.append("{0}/res/".format(os.getcwd()))
 import torch
 import torchvision
 import torch.nn as nn
-from torchvision import datasets, transforms
 from torchvision.utils import save_image
 from torch.autograd import Variable
 import matplotlib.pyplot as plt

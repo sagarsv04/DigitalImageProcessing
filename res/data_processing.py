@@ -3,6 +3,8 @@ import os
 import numpy as np
 import pickle
 from mnist import MNIST
+from torchvision import datasets, transforms
+import torch
 
 
 
@@ -130,7 +132,7 @@ def load_model(save_name):
 		with open("./out/{0}.pkl".format(save_name), "rb") as file:
 			model = pickle.load(file)
 	else:
-		print("No File ... {0}.pkl".format(save_name))
+		print("No File at ... {0}/out/{1}.pkl".format(os.getcwd(), save_name))
 	return model
 
 

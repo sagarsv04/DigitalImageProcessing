@@ -1,7 +1,8 @@
 #/usr/bin/pthon
 import os
 import sys
-os.chdir("../") # the base directory while running any code
+if __name__ == '__main__':
+	os.chdir("../") # the base directory while running any code
 sys.path.append("{0}/res/".format(os.getcwd()))
 import torch
 import numpy as np
@@ -12,7 +13,6 @@ import argparse
 import torch.nn.functional as F
 from torch.autograd import Variable
 from torch.optim import Adam
-from torchvision import datasets, transforms
 import data_processing as dp
 
 

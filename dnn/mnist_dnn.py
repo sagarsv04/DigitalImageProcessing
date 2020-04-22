@@ -1,7 +1,8 @@
 #/usr/bin/pthon
 import os
 import sys
-os.chdir("../") # the base directory while running any code
+if __name__ == '__main__':
+	os.chdir("../") # the base directory while running any code
 sys.path.append("{0}/res/".format(os.getcwd()))
 import numpy as np
 from tqdm import tqdm
