@@ -1,6 +1,8 @@
 #/usr/bin/pthon
 import os
+import sys
 os.chdir("../") # the base directory while running any code
+sys.path.append("{0}/res/".format(os.getcwd()))
 import torch
 import numpy as np
 import torch.nn as nn
@@ -11,26 +13,17 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 from torch.optim import Adam
 from torchvision import datasets, transforms
+import data_processing as dp
 
 
 np.random.seed(42)
 torch.manual_seed(42)
 
+
+MODEL_OVER_WRIGHT = False
 BATCH_SIZE = 200
 EPOCHS = 8
 
-
-class MNISTData():
-	def __init__(self, batch_size):
-		# batch_size = BATCH_SIZE
-		dataset_transform = transforms.Compose([
-					transforms.ToTensor(),
-					transforms.Normalize((0.1307,), (0.3081,))
-					])
-		train_dataset = datasets.MNIST("./data/", train=True, download=True, transform=dataset_transform)
-		test_dataset = datasets.MNIST("./data/", train=False, download=True, transform=dataset_transform)
-		self.train_loader  = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-		self.test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
 
 
 class ConvLayer(nn.Module):
@@ -170,28 +163,22 @@ class CapsNet(nn.Module):
 		return loss * 0.0005
 
 	def save(self, save_name):
-		print("Saving Model ...")
 		if not os.path.exists("./out/"):
 			os.mkdir("./out/")
-		with open("./out/{0}.pkl".format(save_name), "wb") as file:
-			pickle.dump(self, file)
+		if MODEL_OVER_WRIGHT or not os.path.exists("./out/{0}.pkl".format(save_name)):
+			print("Saving Model ...")
+			with open("./out/{0}.pkl".format(save_name), "wb") as file:
+				pickle.dump(self, file)
+		else:
+			print("Saved Model Already Exists ...")
 		return 0
 
-
-def load_model(save_name):
-	model = None
-	if os.path.exists("./out/{0}.pkl".format(save_name)):
-		with open("./out/{0}.pkl".format(save_name), "rb") as file:
-			model = pickle.load(file)
-	else:
-		print("No File ... {0}.pkl".format(save_name))
-	return model
 
 
 def tarin_test_model(is_train, is_test):
 
 	capsule_net = None
-	mnist_data = MNISTData(BATCH_SIZE)
+	mnist_data = dp.MNISTData(BATCH_SIZE)
 	if is_train:
 		try:
 			capsule_net = CapsNet()
@@ -239,7 +226,7 @@ def tarin_test_model(is_train, is_test):
 
 	if is_test:
 		try:
-			capsule_net = load_model("mnist_capsule")
+			capsule_net = dp.load_model("mnist_capsule")
 			capsule_net.eval()
 			print("Testing Model ...")
 			test_accuracy = 0
@@ -260,7 +247,7 @@ def tarin_test_model(is_train, is_test):
 					print("Test Batch {0} Accuracy ... {1}".format(batch_id, accuracy))
 			capsule_net.test_accuracy = test_accuracy
 			print("Training Accuracy ...{0}".format(capsule_net.test_accuracy))
-			# capsule_net.save("mnist_capsule")
+			capsule_net.save("mnist_capsule")
 		except Exception as ex:
 			print("Testing Failed ...")
 			print("Error:: {0}".format(ex))

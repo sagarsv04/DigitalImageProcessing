@@ -3,8 +3,20 @@ import os
 import numpy as np
 import pickle
 from mnist import MNIST
-import matplotlib.pyplot as plt
 
+
+
+class MNISTData():
+	def __init__(self, batch_size):
+		# batch_size = BATCH_SIZE
+		dataset_transform = transforms.Compose([
+					transforms.ToTensor(),
+					transforms.Normalize((0.1307,), (0.3081,))
+					])
+		train_dataset = datasets.MNIST("./data/", train=True, download=True, transform=dataset_transform)
+		test_dataset = datasets.MNIST("./data/", train=False, download=True, transform=dataset_transform)
+		self.train_loader  = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+		self.test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
 
 
 def read_data(train_data=True):
@@ -110,6 +122,16 @@ def load_tf_data(train_data=True):
 			print("No File ... for testing data")
 
 	return data, labels
+
+
+def load_model(save_name):
+	model = None
+	if os.path.exists("./out/{0}.pkl".format(save_name)):
+		with open("./out/{0}.pkl".format(save_name), "rb") as file:
+			model = pickle.load(file)
+	else:
+		print("No File ... {0}.pkl".format(save_name))
+	return model
 
 
 def main():

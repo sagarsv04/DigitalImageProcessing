@@ -2,6 +2,7 @@
 import os
 import sys
 os.chdir("../") # the base directory while running any code
+sys.path.append("{0}/res/".format(os.getcwd()))
 import torch
 import torchvision
 import torch.nn as nn
@@ -13,26 +14,17 @@ import numpy as np
 from tqdm import tqdm
 import pickle
 import argparse
+import data_processing as dp
 
 
 np.random.seed(42)
 torch.manual_seed(42)
 
+
+MODEL_OVER_WRIGHT = False
 BATCH_SIZE = 200
 EPOCHS = 150
 
-
-class MNISTData():
-	def __init__(self, batch_size):
-		# batch_size = BATCH_SIZE
-		dataset_transform = transforms.Compose([
-					transforms.ToTensor(),
-					transforms.Normalize((0.1307,), (0.3081,))
-					])
-		train_dataset = datasets.MNIST("./data/", train=True, download=True, transform=dataset_transform)
-		test_dataset = datasets.MNIST("./data/", train=False, download=True, transform=dataset_transform)
-		self.train_loader  = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-		self.test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
 
 
 # Discriminator
@@ -83,22 +75,15 @@ class GAN(nn.Module):
 		return 0
 
 	def save(self, save_name):
-		print("Saving Model ...")
 		if not os.path.exists("./out/"):
 			os.mkdir("./out/")
-		with open("./out/{0}.pkl".format(save_name), "wb") as file:
-			pickle.dump(self, file)
+		if MODEL_OVER_WRIGHT or not os.path.exists("./out/{0}.pkl".format(save_name)):
+			print("Saving Model ...")
+			with open("./out/{0}.pkl".format(save_name), "wb") as file:
+				pickle.dump(self, file)
+		else:
+			print("Saved Model Already Exists ...")
 		return 0
-
-
-def load_model(save_name):
-	model = None
-	if os.path.exists("./out/{0}.pkl".format(save_name)):
-		with open("./out/{0}.pkl".format(save_name), "rb") as file:
-			model = pickle.load(file)
-	else:
-		print("No File ... {0}.pkl".format(save_name))
-	return model
 
 
 def to_variable(x):
@@ -111,7 +96,7 @@ def to_variable(x):
 def tarin_test_model(is_train, is_generate):
 
 	gan_model = None
-	mnist_data = MNISTData(args.batch_size)
+	mnist_data = dp.MNISTData(args.batch_size)
 
 	if is_train:
 		try:

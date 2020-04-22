@@ -12,6 +12,9 @@ import data_processing as dp
 np.random.seed(42)
 
 
+MODEL_OVER_WRIGHT = False
+
+
 def sigmoid(s):
 	return 1/(1 + np.exp(-s))
 
@@ -100,22 +103,15 @@ class MyNN:
 		return self.a3.argmax()
 
 	def save(self, save_name):
-		print("Saving Model ...")
 		if not os.path.exists("./out/"):
 			os.mkdir("./out/")
-		with open("./out/{0}.pkl".format(save_name), "wb") as file:
-			pickle.dump(self, file)
+		if MODEL_OVER_WRIGHT or not os.path.exists("./out/{0}.pkl".format(save_name)):
+			print("Saving Model ...")
+			with open("./out/{0}.pkl".format(save_name), "wb") as file:
+				pickle.dump(self, file)
+		else:
+			print("Saved Model Already Exists ...")
 		return 0
-
-
-def load_model(save_name):
-	model = None
-	if os.path.exists("./out/{0}.pkl".format(save_name)):
-		with open("./out/{0}.pkl".format(save_name), "rb") as file:
-			model = pickle.load(file)
-	else:
-		print("No File ... {0}.pkl".format(save_name))
-	return model
 
 
 def get_accuracy(model, data, lable, train=True):
@@ -157,7 +153,7 @@ def tarin_test_model(is_train, is_test):
 		if is_test:
 			test_data, test_labels = dp.load_data(train_data=False, normalize=True)
 			# test_data.shape
-			dnn_model = load_model("mnist_dnn")
+			dnn_model = dp.load_model("mnist_dnn")
 			test_labels = get_one_hot_vector_array(test_labels)
 			# dnn_model.weights_matrices
 			if dnn_model != None:
