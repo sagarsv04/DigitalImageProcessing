@@ -3,6 +3,7 @@ import os
 import numpy as np
 import pickle
 from mnist import MNIST
+from tqdm import tqdm
 from torchvision import datasets, transforms
 import torch
 
@@ -102,30 +103,6 @@ def load_data(train_data=True, normalize=False):
 	return data, labels
 
 
-def load_tf_data(train_data=True):
-
-	data, labels = None, None
-
-	if train_data:
-		if os.path.exists("./data/train-images-idx3-ubyte.gz") and \
-			os.path.exists("./data/train-labels-idx1-ubyte.gz"):
-			data, labels = read_data()
-			data = data.reshape((60000, 28, 28, 1)).astype(np.float)
-			labels = labels.reshape((60000)).astype(np.int32)
-		else:
-			print("No File ... for training data")
-	else:
-		if os.path.exists("./data/t10k-images-idx3-ubyte.gz") and \
-			os.path.exists("./data/t10k-labels-idx1-ubyte.gz"):
-			data, labels = read_data(False)
-			data = data.reshape((10000, 28, 28, 1)).astype(np.float)
-			labels = labels.reshape((10000)).astype(np.int32)
-		else:
-			print("No File ... for testing data")
-
-	return data, labels
-
-
 def load_model(save_name):
 	model = None
 	if os.path.exists("./out/{0}.pkl".format(save_name)):
@@ -134,6 +111,18 @@ def load_model(save_name):
 	else:
 		print("No File at ... {0}/out/{1}.pkl".format(os.getcwd(), save_name))
 	return model
+
+
+def get_numpy_array(tensor_list):
+	# tensor_list = model.loss_list
+	numpy_array = None
+	for idx in tqdm(range(len(tensor_list))):
+		# idx = 0
+		if idx == 0:
+			numpy_array = tensor_list[idx].data.cpu().numpy()
+		else:
+			numpy_array	= np.append(numpy_array, tensor_list[idx].data.cpu().numpy())
+	return numpy_array
 
 
 def main():
