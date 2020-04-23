@@ -27,6 +27,9 @@ EPOCHS = 8
 
 
 class ConvLayer(nn.Module):
+	""" A convolution is the simple application of a filter
+		to an input that results in an activation.
+	"""
 	def __init__(self, in_channels=1, out_channels=256, kernel_size=9):
 		super(ConvLayer, self).__init__()
 
@@ -40,6 +43,9 @@ class ConvLayer(nn.Module):
 
 
 class PrimaryCaps(nn.Module):
+	""" Capsules are a vector (an element with size and direction)
+		specifying the features of the object and its likelihood.
+	"""
 	def __init__(self, num_capsules=8, in_channels=256, out_channels=32, kernel_size=9):
 		super(PrimaryCaps, self).__init__()
 
@@ -60,6 +66,10 @@ class PrimaryCaps(nn.Module):
 
 
 class DigitCaps(nn.Module):
+	"""The Encoder takes the image input and learns how to represent it as a
+		16D vector which contains all the information needed
+		to essentially render the image.
+	"""
 	def __init__(self, num_capsules=10, num_routes=32 * 6 * 6, in_channels=8, out_channels=16):
 		super(DigitCaps, self).__init__()
 
@@ -103,6 +113,10 @@ class DigitCaps(nn.Module):
 
 
 class Decoder(nn.Module):
+	"""The decoder takes the 16D vector from the Digit Capsule
+		and learns how to decode the instantiation parameters
+		given into an image of the object it is detecting.
+	"""
 	def __init__(self):
 		super(Decoder, self).__init__()
 

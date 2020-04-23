@@ -109,6 +109,7 @@ def tarin_test_model(is_train, is_generate):
 		try:
 			gan_model = GAN(EPOCHS, args.image_size, args.latent_size, args.hidden_size)
 			# Binary cross entropy loss and optimizer
+			# Entropy is a measure of the uncertainty associated with a given distribution
 			criterion = nn.BCELoss()
 			if torch.cuda.is_available():
 				gan_model.cuda()
