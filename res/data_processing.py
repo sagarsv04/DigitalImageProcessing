@@ -14,7 +14,7 @@ class MNISTData():
 		# batch_size = BATCH_SIZE
 		dataset_transform = transforms.Compose([
 					transforms.ToTensor(),
-					transforms.Normalize((0.1307,), (0.3081,))
+					transforms.Normalize((0.5,), (0.5,))
 					])
 		train_dataset = datasets.MNIST("./data/", train=True, download=True, transform=dataset_transform)
 		test_dataset = datasets.MNIST("./data/", train=False, download=True, transform=dataset_transform)

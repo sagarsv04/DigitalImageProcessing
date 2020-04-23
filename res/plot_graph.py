@@ -10,8 +10,8 @@ sys.path.append("{0}/gan/".format(os.getcwd()))
 import numpy as np
 import pickle
 import argparse
-import data_processing as dp
 import matplotlib.pyplot as plt
+import data_processing as dp
 from mnist_dnn import MyNN
 from cap_dnn import CapsNet, ConvLayer, PrimaryCaps, DigitCaps, Decoder
 from gan_dnn import GAN

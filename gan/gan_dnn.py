@@ -23,7 +23,7 @@ torch.manual_seed(42)
 
 MODEL_OVER_WRIGHT = False
 BATCH_SIZE = 200
-EPOCHS = 150
+EPOCHS = 50
 
 
 
@@ -32,19 +32,26 @@ def discriminator_model(image_size, hidden_size):
 	model = nn.Sequential(
 		nn.Linear(image_size, hidden_size),
 		nn.LeakyReLU(0.2),
-		nn.Linear(hidden_size, hidden_size),
+		nn.Dropout(0.2),
+		nn.Linear(hidden_size, int(hidden_size/2)),
 		nn.LeakyReLU(0.2),
-		nn.Linear(hidden_size, 1),
+		nn.Dropout(0.2),
+		nn.Linear(int(hidden_size/2), int(hidden_size/4)),
+		nn.LeakyReLU(0.2),
+		nn.Dropout(0.2),
+		nn.Linear(int(hidden_size/4), 1),
 		nn.Sigmoid())
 	return model
 
 # Generator
 def generator_model(image_size, latent_size, hidden_size):
 	model = nn.Sequential(
-		nn.Linear(latent_size, hidden_size),
-		nn.ReLU(),
-		nn.Linear(hidden_size, hidden_size),
-		nn.ReLU(),
+		nn.Linear(latent_size, int(hidden_size/4)),
+		nn.LeakyReLU(0.2),
+		nn.Linear(int(hidden_size/4), int(hidden_size/2)),
+		nn.LeakyReLU(0.2),
+		nn.Linear(int(hidden_size/2), hidden_size),
+		nn.LeakyReLU(0.2),
 		nn.Linear(hidden_size, image_size),
 		nn.Tanh())
 	return model
@@ -66,8 +73,8 @@ class GAN(nn.Module):
 
 		self.generator = generator_model(image_size, latent_size, hidden_size)
 		self.discriminator = discriminator_model(image_size, hidden_size)
-		self.g_optimizer = torch.optim.Adam(self.generator.parameters(), lr=0.0002)
-		self.d_optimizer = torch.optim.Adam(self.discriminator.parameters(), lr=0.0002)
+		self.g_optimizer = torch.optim.Adam(self.generator.parameters(), lr=0.0002, betas=(0.5, 0.999))
+		self.d_optimizer = torch.optim.Adam(self.discriminator.parameters(), lr=0.0002, betas=(0.5, 0.999))
 
 	def reset_grad(self):
 		self.d_optimizer.zero_grad()
@@ -101,11 +108,12 @@ def tarin_test_model(is_train, is_generate):
 	if is_train:
 		try:
 			gan_model = GAN(EPOCHS, args.image_size, args.latent_size, args.hidden_size)
-			if torch.cuda.is_available():
-				gan_model.cuda()
-
 			# Binary cross entropy loss and optimizer
 			criterion = nn.BCELoss()
+			if torch.cuda.is_available():
+				gan_model.cuda()
+				criterion.cuda()
+
 			last_batch = len(mnist_data.train_loader)
 			for epoch in tqdm(range(EPOCHS)):
 				# epoch = 0
@@ -204,8 +212,8 @@ def main():
 
 	parser.add_argument("--image_size", type=int, default=28*28) # 28 for MNIST
 	parser.add_argument("--batch_size", type=int, default=100)
-	parser.add_argument("--hidden_size", type=int, default=256)
-	parser.add_argument("--latent_size", type=int, default=64)
+	parser.add_argument("--hidden_size", type=int, default=1024)
+	parser.add_argument("--latent_size", type=int, default=100)
 	parser.add_argument("--model_path", type=str, default="./out/")  # Model Save
 	parser.add_argument("--sample_path", type=str, default="./results/")  # Results
 
