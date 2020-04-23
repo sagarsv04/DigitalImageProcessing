@@ -15,7 +15,7 @@ np.random.seed(42)
 
 MODEL_OVER_WRIGHT = False
 
-
+# Activation
 def sigmoid(s):
 	return 1/(1 + np.exp(-s))
 
@@ -26,18 +26,20 @@ def softmax(s):
 	exps = np.exp(s - np.max(s, axis=1, keepdims=True))
 	return exps/np.sum(exps, axis=1, keepdims=True)
 
+# Loss Function
 def cross_entropy(pred, real):
 	n_samples = real.shape[0]
 	res = pred - real
 	return res/n_samples
 
+# Error Function
 def error(pred, real):
 	n_samples = real.shape[0]
 	logp = - np.log(pred[np.arange(n_samples), real.argmax(axis=1)])
 	loss = np.sum(logp)/n_samples
 	return loss
 
-
+# Create One Hot Vector Error Function
 def get_one_hot_vector_array(labels):
 
 	print("Creating One Hot Vector for Labels ...")
@@ -65,11 +67,13 @@ class MyNN:
 		self.train_accuracy = 0
 		self.test_accuracy = 0
 		self.loss = []
-
+		# weight between input and first hidden layer
 		self.w1 = np.random.randn(ip_dim, neurons)
 		self.b1 = np.zeros((1, neurons))
+		# weight between first hidden layer and second hidden layer
 		self.w2 = np.random.randn(neurons, neurons)
 		self.b2 = np.zeros((1, neurons))
+		# weight between second hidden layer and output layer
 		self.w3 = np.random.randn(neurons, op_dim)
 		self.b3 = np.zeros((1, op_dim))
 		self.y = y
